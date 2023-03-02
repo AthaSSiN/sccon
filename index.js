@@ -1,5 +1,8 @@
-const Web3 = require("Web3");
+const Web3 = require("web3");
 const contract = require("@truffle/contract");
+const { randE, to256Bytes, toBytes } = require('./rsa');
+const { evaluate, verify } = require('./vdf');
+const { BigNumber } = require("@ethersproject/bignumber");
 
 async function run() {
     const provider1 = new Web3.providers.WebsocketProvider("http://127.0.0.1:9545/")
@@ -12,16 +15,31 @@ async function run() {
     let instance = await MyContract.deployed();
 
     async function listen_events() {
-        instance.Transfer({}, (error, result) => {
+        instance.MineVDF(async (error, result) => {
             if (error) console.log(error);
-            console.log(result.returnValues._value);
+            // console.log(result);
+            const g = BigNumber.from(result.returnValues.input);
+            const t = Number(result.returnValues.delay);
+            const proof = evaluate(g, t);
+            // console.log(proof);
+            console.log(verify(g, t, proof));
+
+            let res = await instance.verifyTree.call(to256Bytes(proof.pi), to256Bytes(proof.y), to256Bytes(proof.q), '0x', proof.challenge.nonce, { from: accounts1[0] });
+
+            // await instance.primeEmit(async (error, result) => {
+            //     console.log("hi");
+            //     console.log(BigNumber.from(result.returnValues.l).toString());
+            //     console.log((result.returnValues))
+            // });
+
+            console.log(res);
+            // console.log(g);
         })
     }
 
     listen_events();
 
-    let res = await instance.sendCoin(accounts1[1], 5, { from: accounts1[0] });
+    let res = await instance.beginConsensus(accounts1[1], 5, { from: accounts1[0] });
 } 
 
 run();
-console.log("foj");
